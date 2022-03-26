@@ -24,7 +24,7 @@ Use the following sample code to use the package:
 # Import library
 # ===============================
 # import the library
-from pyNNRW import *
+from pyNNRW.pyNNRW import *
 
 # ===============================
 # Load dataset
