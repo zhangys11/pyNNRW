@@ -1,9 +1,15 @@
+'''
+This RVFL implementation is based on RVFL_plus ( https://github.com/pablozhang/RVFL_plus ).
+Reference: A new learning paradigm for random vector functional-link network: RVFL+. Neural Networks 122 (2020) pp.94-105
+'''
+
 from numpy.linalg import multi_dot
 import numpy as np
 from sklearn.preprocessing import OneHotEncoder
 from sklearn.base import BaseEstimator, ClassifierMixin
 from sklearn.metrics import log_loss, accuracy_score, precision_score, recall_score
 from keras.utils import to_categorical
+from sklearn.model_selection import train_test_split, GridSearchCV
 
 class RVFL(object):
     """
@@ -136,3 +142,56 @@ class RVFL(object):
         val_acc = accuracy_score(val_y, y_pred)
         
         return val_loss, val_acc
+
+
+class RVFLClassifier(BaseEstimator, ClassifierMixin):
+    '''
+    Encapsulate RVFL as a sklearn estimator
+    '''
+    def __init__(self, n_hidden_nodes = 20, activation = 'sigmoid'):
+
+        self.n_hidden_nodes = n_hidden_nodes
+        self.activation = activation
+
+    def fit(self, X, y):     
+        self.model = RVFL(hidden_nodes=self.n_hidden_nodes, 
+                random_type="uniform", 
+                activation_name=self.activation, 
+                type="classification")
+        self.model.fit(X, y)
+        self.classes_ = np.array(list(set(y)))
+
+    def predict(self, X):
+        return self.model.predict(X)
+
+    def predict_proba(self, X):
+        return self.model.predict_proba(X)
+
+class RVFLClassifierCV():
+
+    def __init__(self, hparams = {'n_hidden_nodes': [1, 10], 'activation': ['sigmoid', 'tanh', 'sin'] }):        
+        '''
+        parameters  
+        ----------
+        hparams : hyper-parameter candidate values to be grid-searched
+        '''
+        self.parameters =hparams
+       
+    def fit(self, X, y):
+        rvflc = RVFLClassifier()
+        self.clf = GridSearchCV(rvflc, self.parameters, scoring = 'accuracy') # 'neg_log_loss'
+        self.clf.fit(X, y)
+        # print( sorted(clf.cv_results_.keys()) )
+        return self
+
+    def predict_proba(self, X):
+        return self.clf.predict_proba(X)
+
+    def predict(self, X):
+        return self.clf.predict(X)
+
+def create_rvfl_instance(L):
+    return RVFLClassifier(L)
+
+def create_rvflcv_instance():
+    return RVFLClassifierCV()

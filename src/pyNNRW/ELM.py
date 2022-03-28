@@ -1,5 +1,33 @@
+'''
+This ELM implementation is based on https://github.com/otenim/Numpy-ELM: 
+
+MIT License
+
+Copyright (c) 2019 Otenim
+
+Permission is hereby granted, free of charge, to any person obtaining a copy
+of this software and associated documentation files (the "Software"), to deal
+in the Software without restriction, including without limitation the rights
+to use, copy, modify, merge, publish, distribute, sublicense, and/or sell
+copies of the Software, and to permit persons to whom the Software is
+furnished to do so, subject to the following conditions:
+
+The above copyright notice and this permission notice shall be included in all
+copies or substantial portions of the Software.
+
+THE SOFTWARE IS PROVIDED "AS IS", WITHOUT WARRANTY OF ANY KIND, EXPRESS OR
+IMPLIED, INCLUDING BUT NOT LIMITED TO THE WARRANTIES OF MERCHANTABILITY,
+FITNESS FOR A PARTICULAR PURPOSE AND NONINFRINGEMENT. IN NO EVENT SHALL THE
+AUTHORS OR COPYRIGHT HOLDERS BE LIABLE FOR ANY CLAIM, DAMAGES OR OTHER
+LIABILITY, WHETHER IN AN ACTION OF CONTRACT, TORT OR OTHERWISE, ARISING FROM,
+OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE
+SOFTWARE.
+'''
+
 import numpy as np
 import h5py
+from sklearn.base import BaseEstimator, ClassifierMixin
+from sklearn.model_selection import GridSearchCV
 # from keras import losses
 
 def _mean_squared_error(y_true, y_pred):
@@ -229,7 +257,30 @@ def load_model(filepath):
         )
     return model
 
-from sklearn.base import BaseEstimator, ClassifierMixin
+
+class ELMClassifierCV():
+
+    def __init__(self, hparams = {'n_hidden_nodes': [1, 10], 'activation': ['relu', 'sigmoid', 'identity'] }):        
+        '''
+        parameters  
+        ----------
+        hparams : hyper-parameter candidate values to be grid-searched
+        '''
+        self.parameters =hparams
+       
+    def fit(self, X, y):
+        elmc = ELMClassifier()
+        self.clf = GridSearchCV(elmc, self.parameters, scoring = 'accuracy') # 'neg_log_loss'
+        self.clf.fit(X, y)
+        # print( sorted(clf.cv_results_.keys()) )
+        return self
+
+    def predict_proba(self, X):
+        return self.clf.predict_proba(X)
+
+    def predict(self, X):
+        return self.clf.predict(X)
+
 
 class ELMClassifier(BaseEstimator, ClassifierMixin):
     '''
@@ -261,10 +312,30 @@ class ELMClassifier(BaseEstimator, ClassifierMixin):
         )
         
         self.model.fit(X, y)
-        
+
+    #def predict_proba(self, X):        
+    #    yh = self.model.predict(X)
+    #    # print(yh) # array e.g., 0.37854525 0.         0.         
+    #    return yh
+
     def predict(self, X):
-        return self.model.predict(X)
+        yh = self.model.predict(X)
+        if (len(yh.shape) <= 1):
+            return yh > 0.5 # default 0.5 threshold
+        yh = np.argmax(yh, axis=-1)
+        # print(yh.shape)
+        return yh
 
 
-def create_elm_instance(L):
-    return ELMClassifier(n_hidden_nodes = L, activation = 'relu') # 'identity'
+def create_elm_instance(L, activation = 'relu'):
+    '''
+    Parameters
+    ----------
+    L : n_hidden_nodes
+    activation : {'relu', 'sigmoid', 'identity'}
+    '''
+    return ELMClassifier(n_hidden_nodes = L, activation = activation) # 'identity'
+
+
+def create_elmcv_instance():
+    return ELMClassifierCV()

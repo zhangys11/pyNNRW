@@ -159,5 +159,22 @@ class MLP:
     
 
 from sklearn.neural_network import MLPClassifier
-def create_mlp_instance(L):
-    return MLPClassifier(activation = 'relu', hidden_layer_sizes = L)
+def create_mlp_instance(L, activation = 'relu'):
+    '''
+    The above is a self-implementation of MLP. This one reuses the sklearn.neural_network.MLPClassifier.
+    For regression problem, don't use this. Should use MLPRegressor.
+    
+    Parameters
+    ----------
+
+    L: tuple, length = n_layers - 2, default=(100,)
+        The ith element represents the number of neurons in the ith hidden layer.
+
+    activation: {‘identity’, ‘logistic’, ‘tanh’, ‘relu’}, default=’relu’
+        Activation function for the hidden layer.
+            ‘identity’, no-op activation, useful to implement linear bottleneck, returns f(x) = x
+            ‘logistic’, the logistic sigmoid function, returns f(x) = 1 / (1 + exp(-x)).
+            ‘tanh’, the hyperbolic tan function, returns f(x) = tanh(x).
+            ‘relu’, the rectified linear unit function, returns f(x) = max(0, x)
+    '''
+    return MLPClassifier(activation = activation, hidden_layer_sizes = L)
