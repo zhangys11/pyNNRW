@@ -570,9 +570,10 @@ class FSSE(BaseEstimator, ClassifierMixin):
         
         biggest_fsse_gs = (np.argsort(np.abs(self.meta_learner.coef_[0]))[-N:])[::-1] # take last N item indices and reverse (ord desc)
         biggest_fsse_fs = []
+        ranges = list(self.base_learners)
 
         for idx in biggest_fsse_gs:
-            biggest_fsse_fs = biggest_fsse_fs + list(range(idx*SPLIT, (idx+1)*self.feature_split))
+            biggest_fsse_fs = biggest_fsse_fs + list(  range(ranges[idx][0], ranges[idx][1]) ) # list(range(idx*self.feature_split, (idx+1)*self.feature_split))
     
         biggest_fsse_fs = np.array(biggest_fsse_fs)
 
