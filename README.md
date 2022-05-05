@@ -1,6 +1,9 @@
 # pyNNRW
 
-pyNNRW: A Python library for NNRW (neural network with random weights). 
+pyNNRW: A Python library for NNRW (neural network with random weights).   
+
+    Spectroscopic Profiling-based Geographic Herb Identification by Neural Network with Random Weights [J]. Spectrochimica Acta Part A: Molecular and Biomolecular Spectroscopy, 2022, doi: 10.1016/j.saa.2022.121348
+
 Basic functions:
 1. Implements 2 fundamental NNRW flavors, i.e., ELM and RVFL.  
 2. Performance comparison with main machine learning models, e.g., SVM, decision tree, MLP.   
