@@ -30,31 +30,44 @@ class KRVFL(object):
     y_hat = model.predict(train_x, test_x)
     """
 
-    def __init__(self, type = 'classification', kernels = 2):
-
-        '''
-        kernels = 2 is the default case: linear + sigmoid. It is vanilla RVFL
-        kernels = 1 reduces to a linear model, i.e., RVFL without hidden layer
-        kernels > 2 will add more types of non-linear kernels
-        '''
-        self.type = type
-        self.kernel_dict = {"linear": lambda x, y = None: linear_kernel(x, y),
+    BUILTIN_KERNELS = {"linear": lambda x, y = None: linear_kernel(x, y),
                             "sigmoid": lambda x, y = None: sigmoid_kernel(x, y),
                             "rbf": lambda x, y = None: rbf_kernel(x, y),                            
                             "add_chi2": lambda x, y = None: additive_chi2_kernel(x, y),
                             "chi2": lambda x, y = None: chi2_kernel(x, y),
                             "poly": lambda x, y = None: polynomial_kernel(x, y),
                             "laplace": lambda x, y = None: laplacian_kernel(x, y)}
-        
+
+    def __init__(self, type = 'classification', kernels = ['linear','sigmoid']):
+
+        '''
+        Parameters
+        ----------
+        kernels : int or array. If kernels is an integer n, will use the first n built-in kernels. 
+                  kernels can also be an array of kernel names (duplicate is allowed)
+
+        kernels = ['linear','sigmoid'] is the default case: linear + sigmoid. It is vanilla RVFL
+        kernels = ['linear'] reduces to a linear model, i.e., RVFL without hidden layer
+        kernels = ['sigmoid'] reduceds to ELM.
+        kernels > 2 will add more types of non-linear kernels
+        '''
+        self.type = type
+        self.kernel_dict = KRVFL.BUILTIN_KERNELS        
         self.kernel_names = list(self.kernel_dict.keys())
 
-        # check whether kernel is in valid range
-        if (kernels < 1):
-            kernels = 1
-        if (kernels > len(self.kernel_names ) ):
-            kernels = len(self.kernel_names )
+        if isinstance(kernels,int): # type(kernels) == 'int': # int
+            # check whether kernel is in valid range
+            if (kernels < 1):
+                kernels = 1
+            if (kernels > len(self.kernel_names ) ):
+                kernels = len(self.kernel_names )
 
-        self.kernels = kernels
+            self.kernels = []
+            for i in range(kernels):
+                self.kernels.append(self.kernel_names[i])
+
+        else: # array
+            self.kernels = kernels
 
     def _transform_label(self, y):
         enc = OneHotEncoder(handle_unknown='ignore')
@@ -77,11 +90,11 @@ class KRVFL(object):
         :param train_x: a NumofSamples * NumofFeatures matrix, training data
         :param train_y: training label
         """
-        sum_omegas = self.kernel_dict[self.kernel_names[0]](train_x) # linear kernel
+        sum_omegas = self.kernel_dict[self.kernels[0]](train_x) # linear kernel
         
         # add up the other non-linear kernels 
-        for i in range(1, self.kernels):
-            omega = self.kernel_dict[self.kernel_names[i]](train_x)
+        for i in range(1, len(self.kernels) ): 
+            omega = self.kernel_dict[self.kernels[i]](train_x)
             sum_omegas = omega + sum_omegas
 
         # omega1, omega2 = self.kernel_dict["linear"](train_x), \
@@ -111,11 +124,11 @@ class KRVFL(object):
     def predict_proba(self, train_x, test_x):
 
         # NOTE: Unlike training, in prediction we use (test_x, train_x) as kernel input. train_x acts as anchors of the kernel operations.
-        sum_omegas = self.kernel_dict[self.kernel_names[0]](test_x, train_x) # linear kernel
+        sum_omegas = self.kernel_dict[self.kernels[0]](test_x, train_x) # linear kernel
         
         # add up the other non-linear kernels 
-        for i in range(1, self.kernels):
-            omega = self.kernel_dict[self.kernel_names[i]](test_x, train_x)
+        for i in range(1, len(self.kernels)) :
+            omega = self.kernel_dict[self.kernels[i]](test_x, train_x)
             sum_omegas = omega + sum_omegas
 
         y_hat_temp = (sum_omegas).dot(self.beta)
@@ -131,43 +144,18 @@ class KRVFLClassifier(BaseEstimator, ClassifierMixin):
     Encapsulate RVFL as a sklearn estimator
     '''
     def __init__(self, kernels = 5):
-
-        self.model = KRVFL(kerenes = kernels, type="classification")
+        self.model = KRVFL(kernels = kernels, type="classification") 
 
     def fit(self, X, y):     
-
+        
         self.model.fit(X, y)
         self.classes_ = np.array(list(set(y)))
 
-    def predict(self, X):
-        return self.model.predict(X)
+    def predict(self, X_train, X_test):
+        return self.model.predict(X_train, X_test)
 
-    def predict_proba(self, X):
-        return self.model.predict_proba(X)    
-
-
-class KRVFLClassifierCV():
-
-    def __init__(self, hparams = {'kernels': [1, 10] }):        
-        '''
-        parameters  
-        ----------
-        hparams : hyper-parameter candidate values to be grid-searched
-        '''
-        self.parameters =hparams
-       
-    def fit(self, X, y):
-        rvflc = KRVFLClassifier()
-        self.clf = GridSearchCV(rvflc, self.parameters, scoring = 'accuracy') # 'neg_log_loss'
-        self.clf.fit(X, y)
-        # print( sorted(clf.cv_results_.keys()) )
-        return self
-
-    def predict_proba(self, X):
-        return self.clf.predict_proba(X)
-
-    def predict(self, X):
-        return self.clf.predict(X)
+    def predict_proba(self, X_train, X_test):
+        return self.model.predict_proba(X_train, X_test)    
 
 def create_krvfl_instance(L): # L is the non-linear kernel number
     return KRVFLClassifier(L)
