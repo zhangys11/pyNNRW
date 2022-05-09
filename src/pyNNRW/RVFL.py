@@ -8,7 +8,7 @@ import numpy as np
 from sklearn.preprocessing import OneHotEncoder
 from sklearn.base import BaseEstimator, ClassifierMixin
 from sklearn.metrics import log_loss, accuracy_score, precision_score, recall_score
-from keras.utils import to_categorical
+from tensorflow.keras.utils import to_categorical
 from sklearn.model_selection import train_test_split, GridSearchCV
 
 class RVFL(object):
@@ -165,7 +165,7 @@ class RVFLClassifier(BaseEstimator, ClassifierMixin):
         return self.model.predict(X)
 
     def predict_proba(self, X):
-        return self.model.predict_proba(X)
+        return self.model.predict_proba(X)    
 
 class RVFLClassifierCV():
 

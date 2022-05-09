@@ -24,10 +24,15 @@ OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE
 SOFTWARE.
 '''
 
+import os
 import numpy as np
 import h5py
 from sklearn.base import BaseEstimator, ClassifierMixin
-from sklearn.model_selection import GridSearchCV
+from sklearn.model_selection import GridSearchCV, train_test_split
+from tensorflow.keras.utils import to_categorical
+from sklearn.metrics import log_loss, accuracy_score, recall_score
+from tensorflow.keras.datasets import mnist
+from sklearn.datasets import load_iris
 # from keras import losses
 
 def _mean_squared_error(y_true, y_pred):
@@ -302,10 +307,15 @@ class ELMClassifier(BaseEstimator, ClassifierMixin):
         # ===============================
         # Instantiate ELM
         # ===============================
+        if len(y.shape) == 2: #one-hot
+            n_classes = y.shape[1]
+        else:
+            n_classes = len(set(y))
+
         self.model = ELM(
             n_input_nodes = X.shape[1],
             n_hidden_nodes = self.n_hidden_nodes,
-            n_output_nodes = len(set(y)),
+            n_output_nodes = n_classes,
             loss = self.loss,
             activation = self.activation,
             name = 'elm'
@@ -313,19 +323,135 @@ class ELMClassifier(BaseEstimator, ClassifierMixin):
         
         self.model.fit(X, y)
 
-    #def predict_proba(self, X):        
-    #    yh = self.model.predict(X)
-    #    # print(yh) # array e.g., 0.37854525 0.         0.         
-    #    return yh
+    def predict_proba(self, X):        
+        yh = self.model.predict(X)
+        # print(yh) # array e.g., 0.37854525 0.         0.         
+        return yh
 
     def predict(self, X):
-        yh = self.model.predict(X)
-        if (len(yh.shape) <= 1):
+        yh = self.model.predict(X) # (m,  n_classes)
+        if (len(yh.shape) <= 1): # e.g., (m, )
             return yh > 0.5 # default 0.5 threshold
         yh = np.argmax(yh, axis=-1)
         # print(yh.shape)
         return yh
 
+    def evaluate(self, val_x, val_y, metrics=['loss', 'accuracy']):
+
+        if len(val_y.shape) == 2: #one-hot
+            n_classes = val_y.shape[1]
+            y_gt = val_y
+            val_y = val_y.argmax(-1)
+        else:
+            n_classes = len(set(val_y))
+            y_gt = to_categorical(val_y, len(set(val_y))).astype(np.float32)
+        
+        y_hat = self.predict_proba(val_x)
+        y_pred = self.predict(val_x)
+        # print(val_y.shape, y_gt.shape, y_hat.shape, y_pred.shape)
+        
+        val_loss = log_loss(y_gt, y_hat)
+        val_acc = accuracy_score(val_y, y_pred)
+        val_recall = recall_score(val_y, y_pred, average = 'macro')
+        
+        return val_loss, val_acc
+
+    def save_model(self, path):
+        self.model.save(path)
+
+    def load_model(self, path):
+        self.model = load_model(path)
+
+    def run_example(x_train, x_test, t_train, t_test, save_model_path = ''):
+        
+        # ===============================
+        # ELM parameters
+        # ===============================
+        n_hidden_nodes = x_train.shape[1]
+        loss = 'mean_squared_error' # 'mean_absolute_error'
+        activation = 'sigmoid' # 'identity'
+        n_classes = t_train.shape[1]
+
+        # ===============================
+        # Instantiate ELM
+        # ===============================
+        clf = ELMClassifier()
+
+        # ===============================
+        # Training
+        # ===============================
+        clf.fit(x_train, t_train)
+        train_loss, train_acc = clf.evaluate(x_train, t_train, metrics=['loss', 'accuracy'])
+        print('train_loss: %f' % train_loss) # loss value
+        print('train_acc: %f' % train_acc) # accuracy
+
+        # ===============================
+        # Validation
+        # ===============================
+        val_loss, val_acc = clf.evaluate(x_test, t_test, metrics=['loss', 'accuracy'])
+        print('val_loss: %f' % val_loss)
+        print('val_acc: %f' % val_acc)
+
+        # ===============================
+        # Prediction
+        # ===============================
+        print("\n\n========== prediction on the first 10 test samples ===========\n")
+        x = x_test[:10]
+        t = t_test[:10]
+        y_pred = clf.predict_proba(x)
+
+        for i in range(len(y_pred)):
+            print('---------- prediction %d ----------' % (i+1))
+            class_pred = np.argmax(y_pred[i])
+            prob_pred = y_pred[i][class_pred]
+            class_true = np.argmax(t[i])
+            print('class: %d, probability: %f' % (class_pred, prob_pred))
+            print('class (true): %d' % class_true)
+
+        if (save_model_path):
+
+            # ===============================
+            # Save model
+            # ===============================
+            clf.save_model(save_model_path)
+
+            # ===============================
+            # Load model
+            # ===============================
+            # clf.load_model(save_model_path)
+
+    def run_iris_example():
+
+        # ===============================
+        # Load dataset
+        # ===============================
+        iris = load_iris()
+        n_classes = len(set(iris.target))
+        # stdsc = StandardScaler()
+        # irisx = stdsc.fit_transform(iris.data)
+        x_train, x_test, t_train, t_test = train_test_split(iris.data, iris.target, test_size=0.2)
+        t_train = to_categorical(t_train, n_classes).astype(np.float32)
+        t_test = to_categorical(t_test, n_classes).astype(np.float32)
+
+        ELMClassifier.run_example(x_train, x_test, t_train, t_test)
+
+
+    def run_mnist_example():
+
+        n_classes = 10
+        (x_train, t_train), (x_test, t_test) = mnist.load_data()
+
+        # ===============================
+        # Preprocess
+        # ===============================
+        x_train = x_train.astype(np.float32) / 255.
+        x_train = x_train.reshape(-1, 28**2)
+        x_test = x_test.astype(np.float32) / 255.
+        x_test = x_test.reshape(-1, 28**2)
+        t_train = to_categorical(t_train, n_classes).astype(np.float32)
+        t_test = to_categorical(t_test, n_classes).astype(np.float32)
+
+        ELMClassifier.run_example(x_train, x_test, t_train, t_test)
 
 def create_elm_instance(L, activation = 'relu'):
     '''
@@ -339,3 +465,36 @@ def create_elm_instance(L, activation = 'relu'):
 
 def create_elmcv_instance():
     return ELMClassifierCV()
+
+def ElmRegression(x_train, x_test, t_train, t_test, L = 10, rndb = False):
+    
+    # ===============================
+    # ELM parameters
+    # ===============================
+    n_input_nodes = x_train.shape[1]
+    n_hidden_nodes = max(x_train.shape[1], L) # at least 10 hidden nodes
+    n_output_nodes = t_train.shape[1]
+
+    # ===============================
+    # Initialization
+    # ===============================
+    A = np.random.uniform(-1.,1.,size=(n_input_nodes, n_hidden_nodes))
+    if rndb:
+        b = np.random.uniform(-1.,1.,size=(n_hidden_nodes,))
+    else:
+        b = np.zeros(shape=(n_hidden_nodes,))
+
+    # ===============================
+    # Solve
+    # ===============================
+    H = _sigmoid(x_train @ A + b)
+    B = np.linalg.pinv(H) @ t_train
+
+    # ===============================
+    # Evaluate on CV dataset
+    # ===============================
+    H = _sigmoid(x_test @ A + b)
+    t_pred = H @ B
+
+    MSE = np.mean((t_test - t_pred)**2)
+    return MSE, A, b, B

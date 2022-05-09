@@ -79,3 +79,7 @@ Use the following sample code to use the package:
 
     # Conduct a performance test for ELM at varied L hyper-parameters (1~60). Each iteration is averaged on 20 rounds.
     train_accs, val_accs, ts = nnrw.PerformenceTests(ELMClf, X, y, Ls = list(range(1, 60)), N = 20)
+
+# New function in v0.2.0
+
+We added Kernel-RVFL, which is a generalized form of NNRW. 
