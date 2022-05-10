@@ -129,19 +129,20 @@ class RBFLayer(Layer):
 
 
 from sklearn.base import BaseEstimator, ClassifierMixin
-class RBFNNClassifier(BaseEstimator, ClassifierMixin):
+
+class RBFNN(BaseEstimator, ClassifierMixin):
     '''
     A wrapper for RBF-NN.
     Encapsulate as a sklearn-compatible base learner/estimator
     '''
     
-    def __init__(self, n_hidden_nodes = 20):
+    def __init__(self, n_hidden_nodes = 20, flavor = 'classifier'):
         
         # ===============================
         # parameters
         # ===============================
         self.n_hidden_nodes = n_hidden_nodes # RBF node numbers
-        self.flavor = 'classifier' # or 'regressor'
+        self.flavor = flavor # 'classifier' # or 'regressor'
 
     def fit(self, X, y, batch_size = 16, epochs = 20):
         
@@ -190,6 +191,16 @@ class RBFNNClassifier(BaseEstimator, ClassifierMixin):
         # print(yh.shape)
         return yh
 
+class RBFNNClassifier(RBFNN):
+
+    def isRBFNN(self):
+        return True
+
+    def __init__(self, n_hidden_nodes = 20):
+
+        # invoking the __init__ of the parent class
+        RBFNN.__init__(self, n_hidden_nodes, 'classfier')   
+        
 
 def create_rbfnn_instance(L, activation = 'relu'):
     '''

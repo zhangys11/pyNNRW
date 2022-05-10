@@ -1,6 +1,6 @@
 Metadata-Version: 2.1
 Name: pyNNRW
-Version: 0.1.7
+Version: 0.2.4
 Summary: A Python library for NNRW (neural network with random weights)
 Home-page: https://github.com/zhangys11/pyNNRW
 Author: Yinsheng Zhang (Ph.D.)
@@ -18,11 +18,16 @@ License-File: LICENCE
 
 # pyNNRW
 
-pyNNRW: A Python library for NNRW (neural network with random weights). 
+pyNNRW: A Python library for NNRW (neural network with random weights).   
+
 Basic functions:
 1. Implements 2 fundamental NNRW flavors, i.e., ELM and RVFL.  
 2. Performance comparison with main machine learning models, e.g., SVM, decision tree, MLP.   
 3. NNRW-based ensembles (in progress).
+
+# Publication
+
+Spectroscopic Profiling-based Geographic Herb Identification by Neural Network with Random Weights [J]. Spectrochimica Acta Part A: Molecular and Biomolecular Spectroscopy, 2022, doi: 10.1016/j.saa.2022.121348
 
 # Installation
 
@@ -42,7 +47,7 @@ Use the following sample code to use the package:
     # Import library
     # ===============================
     # import the library
-    from pyNNRW import nnrw
+    from pyNNRW import elm, rvfl
 
     # ===============================
     # Load dataset
@@ -66,7 +71,7 @@ Use the following sample code to use the package:
     # ===============================
     # Instantiate ELM
     # ===============================
-    model = nnrw.ELM(
+    model = elm.ELM( # or rvfl.RVFL
         n_input_nodes = x_train.shape[1],
         n_hidden_nodes = n_hidden_nodes,
         n_output_nodes = n_classes,
@@ -89,6 +94,8 @@ Use the following sample code to use the package:
 
 <2> You may also use high-level APIs, as follows.
 
+    from pyNNRW import nnrw
+
     # train and test an ELM model
     train_acc, val_acc, t = nnrw.ELMClf(X, y, L = 20, verbose = False) # L is hidden layer nodes
 
@@ -97,4 +104,9 @@ Use the following sample code to use the package:
 
     # Conduct a performance test for ELM at varied L hyper-parameters (1~60). Each iteration is averaged on 20 rounds.
     train_accs, val_accs, ts = nnrw.PerformenceTests(ELMClf, X, y, Ls = list(range(1, 60)), N = 20)
+
+# New function in v0.2.0
+
+We added Kernel-NNRW, which provides a series of kernels combined with NNRW.
+
 

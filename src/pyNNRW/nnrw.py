@@ -1,9 +1,9 @@
-from .ELM import *
-from .RVFL import *
-from .MLP import *
-from .DTC import *
-from .LR import *
-from .KNN import *
+from .elm import *
+from .rvfl import *
+from .mlp import *
+from .dtc import *
+from .lr import *
+from .knn import *
 import matplotlib.pyplot as plt
 from sklearn.base import BaseEstimator, ClassifierMixin
 from sklearn.model_selection import train_test_split, GridSearchCV

@@ -29,7 +29,7 @@ Use the following sample code to use the package:
     # Import library
     # ===============================
     # import the library
-    from pyNNRW import nnrw
+    from pyNNRW import elm, rvfl
 
     # ===============================
     # Load dataset
@@ -53,7 +53,7 @@ Use the following sample code to use the package:
     # ===============================
     # Instantiate ELM
     # ===============================
-    model = nnrw.ELM(
+    model = elm.ELM( # or rvfl.RVFL
         n_input_nodes = x_train.shape[1],
         n_hidden_nodes = n_hidden_nodes,
         n_output_nodes = n_classes,
@@ -76,6 +76,8 @@ Use the following sample code to use the package:
 
 <2> You may also use high-level APIs, as follows.
 
+    from pyNNRW import nnrw
+
     # train and test an ELM model
     train_acc, val_acc, t = nnrw.ELMClf(X, y, L = 20, verbose = False) # L is hidden layer nodes
 
@@ -87,4 +89,4 @@ Use the following sample code to use the package:
 
 # New function in v0.2.0
 
-We added Kernel-RVFL, which is a generalized form of NNRW.
+We added Kernel-NNRW, which provides a series of kernels combined with NNRW.
