@@ -277,6 +277,7 @@ class ELMClassifierCV():
         elmc = ELMClassifier()
         self.clf = GridSearchCV(elmc, self.parameters, scoring = 'accuracy') # 'neg_log_loss'
         self.clf.fit(X, y)
+        self.classes_ = np.unique(y)
         # print( sorted(clf.cv_results_.keys()) )
         return self
 
@@ -321,6 +322,7 @@ class ELMClassifier(BaseEstimator, ClassifierMixin):
             name = 'elm'
         )
         
+        self.classes_ = np.unique(y)
         self.model.fit(X, y)
 
     def predict_proba(self, X):        

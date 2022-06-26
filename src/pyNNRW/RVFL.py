@@ -158,8 +158,8 @@ class RVFLClassifier(BaseEstimator, ClassifierMixin):
                 random_type="uniform", 
                 activation_name=self.activation, 
                 type="classification")
-        self.model.fit(X, y)
-        self.classes_ = np.array(list(set(y)))
+        self.model.fit(X, y)        
+        self.classes_ = np.unique(y) # self.classes_ = np.array(list(set(y)))
 
     def predict(self, X):
         return self.model.predict(X)
@@ -182,6 +182,8 @@ class RVFLClassifierCV():
         self.clf = GridSearchCV(rvflc, self.parameters, scoring = 'accuracy') # 'neg_log_loss'
         self.clf.fit(X, y)
         # print( sorted(clf.cv_results_.keys()) )
+        self.classes_ = np.unique(y)
+
         return self
 
     def predict_proba(self, X):
