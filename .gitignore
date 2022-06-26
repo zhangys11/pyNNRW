@@ -3,3 +3,4 @@ notebooks/__pycache__
 notebooks/.ipynb_checkpoints
 dist/
 src/pyNNRW/__pycache__
+src/pyNNRW.egg-info/
