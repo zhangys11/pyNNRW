@@ -302,7 +302,7 @@ class ELMClassifier(BaseEstimator, ClassifierMixin):
         self.n_hidden_nodes = n_hidden_nodes #x_train.shape[1]
         self.loss = 'mean_squared_error' # 'mean_absolute_error'
         self.activation = activation # 'sigmoid' # 'identity' # 'relu'
-       
+        
     def fit(self, X, y):
         
         # ===============================
@@ -324,6 +324,12 @@ class ELMClassifier(BaseEstimator, ClassifierMixin):
         
         self.classes_ = np.unique(y)
         self.model.fit(X, y)
+
+        '''
+        n_features_in_ is the number of features that an estimator expects.
+        In most cases, the n_features_in_ attribute exists only once fit has been called, but there are exceptions.
+        '''
+        self.n_features_in_ = X.shape[1]
 
     def predict_proba(self, X):        
         yh = self.model.predict(X)

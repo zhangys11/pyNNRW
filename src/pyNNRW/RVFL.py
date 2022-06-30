@@ -161,6 +161,12 @@ class RVFLClassifier(BaseEstimator, ClassifierMixin):
         self.model.fit(X, y)        
         self.classes_ = np.unique(y) # self.classes_ = np.array(list(set(y)))
 
+        '''
+        n_features_in_ is the number of features that an estimator expects.
+        In most cases, the n_features_in_ attribute exists only once fit has been called, but there are exceptions.
+        '''
+        self.n_features_in_ = X.shape[1]
+
     def predict(self, X):
         return self.model.predict(X)
 
