@@ -1,3 +1,4 @@
+from . import to_categorical
 from .elm import *
 from .rvfl import *
 from .mlp import *
@@ -11,9 +12,8 @@ from sklearn.ensemble import StackingClassifier
 from sklearn.tree import DecisionTreeClassifier
 from sklearn.svm import SVC
 from sklearn.multiclass import OneVsOneClassifier, OneVsRestClassifier
-from keras.utils import to_categorical
+from sklearn.metrics import r2_score
 import numpy as np
-from tqdm import tqdm
 import time
 import matplotlib.ticker as mticker
 
@@ -128,7 +128,7 @@ def RVFLClf(X, y, L = 100, verbose = False):
     time2 = time.time_ns()
     # print('RVFL took {:.3f} ms'.format((time2-time1)/ (10 ** 6)))
         
-    train_loss, train_acc = model.evaluate(x_train, t_train)
+    train_loss, train_acc, train_precision, train_recall = model.evaluate(x_train, t_train)
     if (verbose):
         print('train_loss: %f' % train_loss) # loss value
         print('train_acc: %f' % train_acc) # accuracy
@@ -139,7 +139,7 @@ def RVFLClf(X, y, L = 100, verbose = False):
     # ===============================
     # Validation
     # ===============================
-    val_loss, val_acc = model.evaluate(x_test, t_test)
+    val_loss, val_acc, val_precision, val_recall = model.evaluate(x_test, t_test)
     if (verbose):
         print('val_loss: %f' % val_loss)
         print('val_acc: %f' % val_acc)
@@ -499,6 +499,7 @@ class FSSE(BaseEstimator, ClassifierMixin):
     fsse = FSSE(create_elmcv_instance, feature_split = split)
     fsse.fit(X, y)
     acc = fsse.evaluate(X, y) # accuracy
+    
     '''
     def __init__(self, create_base_estimator_cv, feature_split = 'all', meta_l1_ratios = [0.5,0.6,0.7,0.8,0.9,1.0]):
 
@@ -534,19 +535,49 @@ class FSSE(BaseEstimator, ClassifierMixin):
         # plt.plot(meta_learner.coef_[0])
         # return base_learners, meta_learner  
 
-    def predict(self, X):
+    def base_predict(self, X):
+        '''
+        base leaners' prediction, used as the input for meta-learner
+        '''
         predicts = []
         for b in self.base_learners:
             FS = X[:,b[0]:b[1]]
             yhat = self.base_learners[b].predict(FS)
             predicts.append(yhat)
 
-        predicts = np.array(predicts).T
+        return np.array(predicts).T
+
+    def predict(self, X):
+
+        predicts = self.base_predict(X)
         return self.meta_learner.predict(predicts)
     
-    def evaluate(self, X, y, metrics=['accuracy']):
-        y_hat = self.predict(X)        
-        return (y_hat == y).mean()
+    def predict_proba(self, X):
+
+        predicts = self.base_predict(X)
+        return self.meta_learner.predict_proba(predicts)
+    
+    def evaluate(self, X, y, metrics=['accuracy','r2']):
+        '''
+        Parameters
+        ----------
+        metrics : an array
+            accuracy - Classification Accuracy
+            r2 - The coefficient of determination. 
+                R2 is a number between 0 and 1 that measures how well a statistical model 
+                predicts an outcome.
+        '''
+        y_hat = self.predict(X)
+        acc = (y_hat == y).mean()
+
+        if len(set(y)) == 2:
+            y_proba = np.array(self.predict_proba(X))
+            y_reg = y_proba[:,1] # suppose col 1 is for Y = 1
+            r2a = r2_score(y, y_reg) # an alternative r2 
+
+        r2 = r2_score(y, y_hat) # R2 is a regression score, we use the predicted probs as a regression for y label.
+
+        return acc, r2
 
     # def plot_feature_importance():
     #    plot_feature_importance(np.abs(self.meta_learner.coef_[0]), 'FSSE FS Result') # need to include feature_importance.py

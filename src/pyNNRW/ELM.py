@@ -29,10 +29,9 @@ import numpy as np
 import h5py
 from sklearn.base import BaseEstimator, ClassifierMixin
 from sklearn.model_selection import GridSearchCV, train_test_split
-from tensorflow.keras.utils import to_categorical
+from . import to_categorical
 from sklearn.metrics import log_loss, accuracy_score, recall_score
-from tensorflow.keras.datasets import mnist
-from sklearn.datasets import load_iris
+from sklearn.datasets import load_iris,load_digits
 # from keras import losses
 
 def _mean_squared_error(y_true, y_pred):
@@ -443,8 +442,9 @@ class ELMClassifier(BaseEstimator, ClassifierMixin):
 
         ELMClassifier.run_example(x_train, x_test, t_train, t_test)
 
-
     def run_mnist_example():
+
+        from keras.datasets import mnist
 
         n_classes = 10
         (x_train, t_train), (x_test, t_test) = mnist.load_data()

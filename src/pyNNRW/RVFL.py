@@ -8,8 +8,8 @@ import numpy as np
 from sklearn.preprocessing import OneHotEncoder
 from sklearn.base import BaseEstimator, ClassifierMixin
 from sklearn.metrics import log_loss, accuracy_score, precision_score, recall_score
-from tensorflow.keras.utils import to_categorical
 from sklearn.model_selection import train_test_split, GridSearchCV
+from . import to_categorical
 
 class RVFL(object):
     """
@@ -132,7 +132,13 @@ class RVFL(object):
         else:
             return y_hat_temp
         
-    def evaluate(self, val_x, val_y, metrics=['loss', 'accuracy']):
+    def evaluate(self, val_x, val_y, metrics=['loss', 'accuracy', 'precision', 'recall']):
+        '''        
+        Returns
+        -------
+        'loss', 'accuracy', 'precision', 'recall'
+        '''
+
         y_gt = to_categorical(val_y, len(set(val_y))).astype(np.float32)
         y_hat = self.predict_proba(val_x)
         y_pred = self.predict(val_x)
@@ -140,8 +146,10 @@ class RVFL(object):
         
         val_loss = log_loss(y_gt, y_hat)
         val_acc = accuracy_score(val_y, y_pred)
+        val_precision = precision_score(val_y, y_pred) 
+        val_recall = recall_score(val_y, y_pred)
         
-        return val_loss, val_acc
+        return val_loss, val_acc, val_precision, val_recall
 
 
 class RVFLClassifier(BaseEstimator, ClassifierMixin):
