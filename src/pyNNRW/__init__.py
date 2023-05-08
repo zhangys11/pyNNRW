@@ -2,6 +2,8 @@
 import importlib.metadata
 __version__ = importlib.metadata.version('pyNNRW')
 
+import numpy as np
+
 def to_categorical(y, num_classes=None, dtype="float32"):
     """
     This function is copied from keras.

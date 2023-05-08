@@ -29,7 +29,7 @@ class RVFL(object):
     """
     def __init__(self, hidden_nodes=50, 
                  random_type="uniform", 
-                 activation_name="sigmoid", 
+                 activation_name="sigmoid",
                  type="classification"):
 
         self.hidden_nodes = hidden_nodes
@@ -162,9 +162,9 @@ class RVFLClassifier(BaseEstimator, ClassifierMixin):
         self.activation = activation
 
     def fit(self, X, y):     
-        self.model = RVFL(hidden_nodes=self.n_hidden_nodes, 
-                random_type="uniform", 
-                activation_name=self.activation, 
+        self.model = RVFL(hidden_nodes=self.n_hidden_nodes,
+                random_type="uniform",
+                activation_name=self.activation,
                 type="classification")
         self.model.fit(X, y)        
         self.classes_ = np.unique(y) # self.classes_ = np.array(list(set(y)))
@@ -179,7 +179,13 @@ class RVFLClassifier(BaseEstimator, ClassifierMixin):
         return self.model.predict(X)
 
     def predict_proba(self, X):
-        return self.model.predict_proba(X)    
+        return self.model.predict_proba(X)  
+
+    def evaluate(self, X, y, metrics=['loss', 'accuracy', 'precision', 'recall']):
+        '''
+        Return loss, accuracy, precision, recall by default
+        '''
+        return self.model.evaluate(X, y, metrics=metrics)
 
 class RVFLClassifierCV():
 
@@ -206,8 +212,8 @@ class RVFLClassifierCV():
     def predict(self, X):
         return self.clf.predict(X)
 
-def create_rvfl_instance(L):
-    return RVFLClassifier(L)
+def create_rvfl_instance(L, activation = 'sigmoid'):
+    return RVFLClassifier(L, activation)
 
 def create_rvflcv_instance():
     return RVFLClassifierCV()
