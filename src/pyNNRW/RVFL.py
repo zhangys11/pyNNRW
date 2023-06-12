@@ -28,7 +28,7 @@ class RVFL(object):
     y_hat = model.predict(test_x)
     """
     def __init__(self, hidden_nodes=50, 
-                 random_type="uniform", 
+                 random_type="uniform",
                  activation_name="sigmoid",
                  type="classification"):
 
@@ -141,9 +141,10 @@ class RVFL(object):
 
         y_gt = to_categorical(val_y, len(set(val_y))).astype(np.float32)
         y_hat = self.predict_proba(val_x)
+        y_hat = np.nan_to_num(y_hat) # replace nan
         y_pred = self.predict(val_x)
         # print(val_y.shape, y_gt.shape, y_hat.shape, y_pred.shape)
-        
+
         val_loss = log_loss(y_gt, y_hat)
         val_acc = accuracy_score(val_y, y_pred)
         val_precision = precision_score(val_y, y_pred) 
@@ -161,12 +162,12 @@ class RVFLClassifier(BaseEstimator, ClassifierMixin):
         self.n_hidden_nodes = n_hidden_nodes
         self.activation = activation
 
-    def fit(self, X, y):     
+    def fit(self, X, y):
         self.model = RVFL(hidden_nodes=self.n_hidden_nodes,
-                random_type="uniform",
+                random_type="gaussian",
                 activation_name=self.activation,
                 type="classification")
-        self.model.fit(X, y)        
+        self.model.fit(X, y)
         self.classes_ = np.unique(y) # self.classes_ = np.array(list(set(y)))
 
         '''

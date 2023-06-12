@@ -1,24 +1,20 @@
-from . import to_categorical
-from .elm import *
-from .rvfl import *
-from .mlp import *
-from .dtc import *
-from .lr import *
-from .knn import *
-import matplotlib.pyplot as plt
-from sklearn.base import BaseEstimator, ClassifierMixin
-from sklearn.model_selection import train_test_split, GridSearchCV
-from sklearn.ensemble import StackingClassifier
-from sklearn.tree import DecisionTreeClassifier
-from sklearn.svm import SVC
-from sklearn.multiclass import OneVsOneClassifier, OneVsRestClassifier
-from sklearn.metrics import r2_score
-import numpy as np
-import time
-import matplotlib.ticker as mticker
-
 import warnings
 warnings.filterwarnings("ignore")
+
+import time
+import numpy as np
+import matplotlib.pyplot as plt
+import matplotlib.ticker as mticker
+from sklearn.base import BaseEstimator, ClassifierMixin
+from sklearn.model_selection import train_test_split
+from sklearn.linear_model import LogisticRegression
+from sklearn.ensemble import StackingClassifier #,HistGradientBoostingClassifier
+from sklearn.tree import DecisionTreeClassifier
+from sklearn.svm import SVC
+from sklearn.multiclass import OneVsOneClassifier
+from sklearn.metrics import r2_score
+
+from . import to_categorical
 
 #region Performance Test. Compare NNRW with mainstream classifier models.
 
@@ -413,15 +409,67 @@ def PerformenceTests(func, X, y, Ls = list(range(1, 80)), N = 20):
 
 #region ensembles
 
-def homo_stacking(X, y, create_base_estimator, Ns = [1, 2, 5], Ls = [1, 2, 5, 10, 20], repeat = 10, WITH_CONTEXT = True, xlabel = ''):
+class LogisticRegressionX(LogisticRegression, ClassifierMixin):
+    '''
+    An extended version of logistic regression that handles NaN.
+    '''
+    
+    def __init__(
+        self,
+        penalty="l2",
+        tol=1e-4,
+        C=1.0,
+        l1_ratio=None):
+        
+        LogisticRegression.__init__(self, penalty = penalty, tol=tol, C=C, l1_ratio=l1_ratio)
+        
+    def fit(self, X, y):
+
+        X = np.nan_to_num(X)
+        y = np.nan_to_num(y)
+        clf = LogisticRegression.fit(self, X=X, y=y)
+        clf.coef_ = np.nan_to_num(clf.coef_)
+        clf.intercept_ = np.nan_to_num(clf.intercept_)
+        return clf
+
+    def predict_proba(self, X):
+        X = np.nan_to_num(X)       
+        yh = LogisticRegression.predict_proba(self, X=X)
+        yh = np.nan_to_num(yh)
+        return yh
+
+    def predict(self, X):
+        X = np.nan_to_num(X)
+        yp = LogisticRegression.predict(self, X=X)
+        yp = np.nan_to_num(yp)
+        return yp
+    
+    def score(self, X, y):
+        X = np.nan_to_num(X)
+        y = np.nan_to_num(y)
+        return LogisticRegression.score(X=X, y=y)   
+
+def homo_stacking(X, y, create_base_estimator, meta_learner = LogisticRegressionX,
+                  Ns = [1, 2, 5], Ls = [1, 2, 5, 10, 20], 
+                  test_size = .3, 
+                  random_state = None,
+                  WITH_CONTEXT = False, 
+                  xlabel = '',
+                  YLIM = (.5, 1.05)):
     '''
     create_base_estimator # a function that create base learner instanes
     Ns = [1, 2, 5] # number of base estimators
-    Ls = [1, 2, 5, 10, 20] # base learner's specific hyper-parameter
-    repeat = 10 # run multiple times to get the mean
+    Ls = [1, 2, 5, 10, 20] # base learner's specific hyper-parameter    
     '''
 
     # pbar = tqdm(total = repeat * len(Ns) * len(Ls), position=0, leave=True) # stay on top
+
+    X_train, X_test, y_train, y_test = train_test_split(
+        X, y, stratify=y, test_size=test_size, random_state=random_state,
+    )
+        
+    dic_acc = {}
+    repeat = 1 # no need to repeat, each run is now deterministic.
 
     plt.figure(figsize = (14, 6))
 
@@ -430,27 +478,31 @@ def homo_stacking(X, y, create_base_estimator, Ns = [1, 2, 5], Ls = [1, 2, 5, 10
 
         for L in Ls:        
 
-            acc = 0
+            accs = []
 
-            for iter in range(repeat):
-
-                X_train, X_test, y_train, y_test = train_test_split(
-                    X, y
-                )
+            for _ in range(repeat):
 
                 estimators = []
                 for i in range(N):
                     estimators.append((str(i), create_base_estimator(L))) # relu is better than logistic
 
                 clf = StackingClassifier(
-                    estimators=estimators, final_estimator=LogisticRegression(), passthrough = WITH_CONTEXT
+                    estimators=estimators, final_estimator=meta_learner(), passthrough = WITH_CONTEXT
                 )
 
-                acc = acc + clf.fit(X_train, y_train).score(X_test, y_test)
+                # acc = acc + clf.fit(X_train, y_train).score(X_test, y_test)
+                accs.append(clf.fit(X_train, y_train).score(X_test, y_test))
 
                 # pbar.update()
-
-            ACCs.append(acc / repeat)
+            
+            # remove the biggest and smallest from accs and get mean 
+            # print('acc of all runs:', np.round(accs,2))
+            averaged_acc = sum(accs)/repeat
+            if repeat >= 3:
+                averaged_acc = sum(sorted(accs)[1:-1]) / (len(accs) - 2)
+            
+            ACCs.append(averaged_acc)
+            dic_acc[(N, L)] = averaged_acc
 
         plt.plot(Ls, ACCs, '--', label = 'N='+str(N), marker='o') # fillstyle='none'
         # plt.scatter(Ls, ACCs, s = 50)
@@ -459,9 +511,12 @@ def homo_stacking(X, y, create_base_estimator, Ns = [1, 2, 5], Ls = [1, 2, 5, 10
     plt.legend()
     plt.xlabel('Hyper-parameter' + xlabel)
     plt.ylabel("Classfication Accuracy")
+    plt.ylim(YLIM)
     plt.show()
 
-    return ACCs
+    print('best test accuracy: ', max(dic_acc.values()), 'N, L = ', [key for key, value in dic_acc.items() if value == max(dic_acc.values())])
+
+    return dic_acc
     
 def hetero_stacking(X, y, estimators, repeat = 10, WITH_CONTEXT = True):
     '''
@@ -476,7 +531,7 @@ def hetero_stacking(X, y, estimators, repeat = 10, WITH_CONTEXT = True):
         )
 
         clf = StackingClassifier(
-            estimators=estimators, final_estimator=LogisticRegression(), passthrough = WITH_CONTEXT
+            estimators=estimators, final_estimator=LogisticRegressionCV(), passthrough = WITH_CONTEXT
         )
 
         acc = acc + clf.fit(X_train, y_train).score(X_test, y_test)
