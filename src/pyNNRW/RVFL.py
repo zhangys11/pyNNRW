@@ -1,18 +1,234 @@
-'''
-This RVFL implementation is based on RVFL_plus ( https://github.com/pablozhang/RVFL_plus ).
-Reference: A new learning paradigm for random vector functional-link network: RVFL+. Neural Networks 122 (2020) pp.94-105
-'''
-
-from numpy.linalg import multi_dot
 import numpy as np
+from numpy.linalg import multi_dot
 from sklearn.preprocessing import OneHotEncoder
 from sklearn.base import BaseEstimator, ClassifierMixin
 from sklearn.metrics import log_loss, accuracy_score, precision_score, recall_score
-from sklearn.model_selection import train_test_split, GridSearchCV
+from sklearn.model_selection import GridSearchCV
 from . import to_categorical
 
-class RVFL(object):
+
+class RVFL:
     """
+    A simple RVFL classifier or regression.
+    This implementation is based on https://github.com/Xuyang-Huang/Simple-RVFL-python/tree/main
+
+    Attributes:
+        n_nodes: An integer of enhancement node number.
+        lam: A floating number of regularization parameter.
+        w_random_vec_range: A list, [min, max], the range of generating random weights.
+        b_random_vec_range: A list, [min, max], the range of generating random bias.
+        random_weights: A Numpy array shape is [n_feature, n_nodes], weights of neuron.
+        random_bias: A Numpy array shape is [n_nodes], bias of neuron.
+        beta: A Numpy array shape is [n_feature + n_nodes, n_class], the projection matrix.
+        activation: A string of activation name.
+        data_std: A list, store normalization parameters for each layer.
+        data_mean: A list, store normalization parameters for each layer.
+        same_feature: A bool, the true means all the features have same meaning and boundary for example: images.
+        task_type: A string of ML task type, 'classification' or 'regression'.
+    """
+    def __init__(self, n_nodes, lam, w_random_vec_range = [-1, 1], 
+                 b_random_vec_range = [0, 1], activation = 'sigmoid', 
+                 same_feature=False,
+                 task_type='classification'):
+        assert task_type in ['classification', 'regression'], 'task_type should be "classification" or "regression".'
+        self.n_nodes = n_nodes
+        self.lam = lam
+        self.w_random_range = w_random_vec_range
+        self.b_random_range = b_random_vec_range
+        self.random_weights = None
+        self.random_bias = None
+        self.beta = None
+        a = Activation()
+        self.activation_function = getattr(a, activation)
+        self.data_std = None
+        self.data_mean = None
+        self.same_feature = same_feature
+        self.task_type = task_type
+
+    def train(self, data, label, n_class):
+        """
+
+        :param data: Training data.
+        :param label: Training label.
+        :param n_class: An integer of number of class. In regression, this parameter won't be used.
+        :return: No return
+        """
+
+        assert len(data.shape) > 1, 'Data shape should be [n, dim].'
+        assert len(data) == len(label), 'Label number does not match data number.'
+        assert len(label.shape) == 1, 'Label should be 1-D array.'
+
+        data = self.standardize(data)  # Normalization data
+        n_sample = len(data) #样本数量
+        n_feature = len(data[0]) #特征数量
+        self.random_weights = self.get_random_vectors(n_feature, self.n_nodes, self.w_random_range) #构成随机权重值
+        self.random_bias = self.get_random_vectors(1, self.n_nodes, self.b_random_range) #构成随机偏置值
+        
+        #点积，并添加偏置项，使用激活函数处理，得到激活值h
+        h = self.activation_function(np.dot(data, self.random_weights) + np.dot(np.ones([n_sample, 1]), self.random_bias))
+        d = np.concatenate([h, data], axis=1)
+        d = np.concatenate([d, np.ones_like(d[:, 0:1])], axis=1)
+        if self.task_type == 'classification':
+            y = self.one_hot(label, n_class) #进行独热编码
+        else:
+            y = label
+        if n_sample > (self.n_nodes + n_feature):
+            self.beta = np.linalg.inv((self.lam * np.identity(d.shape[1]) + np.dot(d.T, d))).dot(d.T).dot(y)
+        else:
+            self.beta = d.T.dot(np.linalg.inv(self.lam * np.identity(n_sample) + np.dot(d, d.T))).dot(y)
+
+    def predict(self, data):
+        """
+
+        :param data: Predict data.
+        :return: When classification, return Prediction result and probability.
+                 When regression, return the output of rvfl.
+        """
+        data = self.standardize(data)  # Normalization data
+        h = self.activation_function(np.dot(data, self.random_weights) + self.random_bias)
+        d = np.concatenate([h, data], axis=1)
+        d = np.concatenate([d, np.ones_like(d[:, 0:1])], axis=1)
+        output = np.dot(d, self.beta)
+        if self.task_type == 'classification':
+            proba = self.softmax(output)
+            result = np.argmax(proba, axis=1)
+            return result, proba
+        elif self.task_type == 'regression':
+            return output
+
+    def eval(self, data, label):
+        """
+
+        :param data: Evaluation data.
+        :param label: Evaluation label.
+        :return: When classification return accuracy.
+                 When regression return MAE.
+        """
+
+        assert len(data.shape) > 1, 'Data shape should be [n, dim].'
+        assert len(data) == len(label), 'Label number does not match data number.'
+        assert len(label.shape) == 1, 'Label should be 1-D array.'
+
+        data = self.standardize(data)  # Normalization data
+        h = self.activation_function(np.dot(data, self.random_weights) + self.random_bias)
+        d = np.concatenate([h, data], axis=1)
+        d = np.concatenate([d, np.ones_like(d[:, 0:1])], axis=1)
+        output = np.dot(d, self.beta)
+        if self.task_type == 'classification':
+            result = np.argmax(output, axis=1)
+            acc = np.sum(np.equal(result, label)) / len(label)
+            return acc
+        elif self.task_type == 'regression':
+            mae = np.mean(np.abs(output - label))
+            return mae
+
+    @staticmethod
+    def get_random_vectors(m, n, scale_range):
+        x = (scale_range[1] - scale_range[0]) * np.random.random([m, n]) + scale_range[0]
+        return x
+
+    @staticmethod
+    def one_hot(x, n_class):
+        y = np.zeros([len(x), n_class])
+        for i in range(len(x)):
+            y[i, x[i]] = 1
+        return y
+
+    def standardize(self, x):
+        if self.same_feature is True:
+            if self.data_std is None:
+                self.data_std = np.maximum(np.std(x), 1/np.sqrt(len(x)))
+            if self.data_mean is None:
+                self.data_mean = np.mean(x)
+            return (x - self.data_mean) / self.data_std
+        else:
+            if self.data_std is None:
+                self.data_std = np.maximum(np.std(x, axis=0), 1/np.sqrt(len(x)))
+            if self.data_mean is None:
+                self.data_mean = np.mean(x, axis=0)
+            return (x - self.data_mean) / self.data_std
+
+    @staticmethod
+    def softmax(x):
+        return np.exp(x) / np.repeat((np.sum(np.exp(x), axis=1))[:, np.newaxis], len(x[0]), axis=1)
+
+class Activation:
+    @staticmethod
+    def sigmoid(x):
+        return 1 / (1 + np.e ** (-x))
+
+    @staticmethod
+    def sine(x):
+        return np.sin(x)
+
+    @staticmethod
+    def tanh(x):
+        return np.tanh(x)
+
+    @staticmethod
+    def hardlim(x):
+        return (np.sign(x) + 1) / 2
+
+    @staticmethod
+    def tribas(x):
+        return np.maximum(1 - np.abs(x), 0)
+
+    @staticmethod
+    def radbas(x):
+        return np.exp(-(x**2))
+
+    @staticmethod
+    def sign(x):
+        return np.sign(x)
+
+    @staticmethod
+    def relu(x):
+        return np.maximum(0, x)
+
+class RVFLClassifier(BaseEstimator, ClassifierMixin):
+    '''
+    Encapsulate RVFL as a sklearn estimator
+    '''
+    def __init__(self, n_hidden_nodes = 20, activation = 'sigmoid'):
+
+        self.n_hidden_nodes = n_hidden_nodes
+        self.activation = activation
+        self.model = RVFL(n_nodes=self.n_hidden_nodes, lam=0.1,
+                          activation=self.activation, task_type='classification')
+        print(self.n_hidden_nodes, self.activation)
+        self.classes_ = 0
+        self.n_features_in_ = 0
+
+    def fit(self, X, y):        
+        self.model.train(X, y, len(set(y)))
+        self.classes_ = np.unique(y) # self.classes_ = np.array(list(set(y)))
+
+        '''
+        n_features_in_ is the number of features that an estimator expects.
+        In most cases, the n_features_in_ attribute exists only once fit has been called, but there are exceptions.
+        '''
+        self.n_features_in_ = X.shape[1]
+
+    def predict(self, X):
+        predition, _ = self.model.predict(X)
+        return predition
+
+    def predict_proba(self, X):
+        _, proba = self.model.predict(X)
+        return proba
+
+    def evaluate(self, X, y):
+        '''
+        Return classification accuracy by default
+        '''
+        return self.model.eval(X, y)
+
+
+class RVFL_v2(object):
+    """
+    This RVFL implementation is based on RVFL_plus ( https://github.com/pablozhang/RVFL_plus ).
+    Reference: A new learning paradigm for random vector functional-link network: RVFL+. Neural Networks 122 (2020) pp.94-105
+
     Parameters
     ----------
     hidden_nodes : default 50, the number of enhancement node between the input layer and the hidden layer
@@ -153,7 +369,7 @@ class RVFL(object):
         return val_loss, val_acc, val_precision, val_recall
 
 
-class RVFLClassifier(BaseEstimator, ClassifierMixin):
+class RVFLClassifier_v2(BaseEstimator, ClassifierMixin):
     '''
     Encapsulate RVFL as a sklearn estimator
     '''
@@ -163,7 +379,7 @@ class RVFLClassifier(BaseEstimator, ClassifierMixin):
         self.activation = activation
 
     def fit(self, X, y):
-        self.model = RVFL(hidden_nodes=self.n_hidden_nodes,
+        self.model = RVFL_v2(hidden_nodes=self.n_hidden_nodes,
                 random_type="gaussian",
                 activation_name=self.activation,
                 type="classification")
@@ -213,8 +429,23 @@ class RVFLClassifierCV():
     def predict(self, X):
         return self.clf.predict(X)
 
-def create_rvfl_instance(L, activation = 'sigmoid'):
-    return RVFLClassifier(L, activation)
+def create_rvfl_instance(L, activation = 'sigmoid', flavor = 'v1'):
+    '''
+    Return a sklearn estimator compatible RVFL instance
+
+    Parameters
+    ----------
+    L : hidden layer nodes
+    activation : activation function
+    flavor : 'v1' or 'v2'. Choose either of the two RVFL implementations. 
+    '''
+    if flavor == 'v1':
+        return RVFLClassifier(L, activation)
+    else:
+        return RVFLClassifier_v2(L, activation)
 
 def create_rvflcv_instance():
+    '''
+    Return a sklearn estimator compatible RVFL CV instance
+    '''
     return RVFLClassifierCV()
