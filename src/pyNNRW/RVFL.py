@@ -1,5 +1,4 @@
 import numpy as np
-from numpy.linalg import multi_dot
 from sklearn.preprocessing import OneHotEncoder
 from sklearn.base import BaseEstimator, ClassifierMixin
 from sklearn.metrics import log_loss, accuracy_score, precision_score, recall_score
@@ -195,7 +194,7 @@ class RVFLClassifier(BaseEstimator, ClassifierMixin):
         self.activation = activation
         self.model = RVFL(n_nodes=self.n_hidden_nodes, lam=0.1,
                           activation=self.activation, task_type='classification')
-        print(self.n_hidden_nodes, self.activation)
+        # print(self.n_hidden_nodes, self.activation)
         self.classes_ = 0
         self.n_features_in_ = 0
 
@@ -396,7 +395,10 @@ class RVFLClassifier_v2(BaseEstimator, ClassifierMixin):
         return self.model.predict(X)
 
     def predict_proba(self, X):
-        return self.model.predict_proba(X)  
+        '''
+        Return the predicted probability distribution.
+        '''
+        return self.model.predict_proba(X)
 
     def evaluate(self, X, y, metrics=['loss', 'accuracy', 'precision', 'recall']):
         '''

@@ -245,10 +245,16 @@ def KernelTuning(X):
 
     return
 
-def KNNRWGridSearch(x_train, x_test, t_train, t_test, verbose = 0):
+def KNNRWClassifierGridSearch(x_train, x_test, t_train, t_test, K=22, verbose = 0):
+    '''
+    Perform a grid search for the best kernel combinations.
+
+    Parameters
+    ----------
+    K : int, the maximum kernel numbers. default = 22
+    '''
 
     N = x_train.shape[1]
-    K = 22
 
     taccs = []
     vaccs = []
@@ -305,7 +311,7 @@ def KNNRWGridSearch(x_train, x_test, t_train, t_test, verbose = 0):
         plt.xticks(rotation=-90)
         plt.show()
 
-    return taccs, vaccs    
+    return taccs, vaccs
 
 
 class KNNRWClassifier(BaseEstimator, ClassifierMixin):
@@ -318,7 +324,7 @@ class KNNRWClassifier(BaseEstimator, ClassifierMixin):
     def fit(self, X, y, verbose = 0):     
         
         self.model.fit(X, y, verbose = verbose)
-        self.classes_ = np.array(list(set(y)))
+        # self.classes_ = np.array(list(set(y)))
 
     def predict(self, X_train, X_test):
         return self.model.predict(X_train, X_test)

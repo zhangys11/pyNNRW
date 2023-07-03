@@ -1,4 +1,8 @@
 '''
+Major revisions: 
+1. added multi-class support 
+2. Encapsule ELM into a sklearn compatible estimator 
+
 This ELM implementation is based on https://github.com/otenim/Numpy-ELM: 
 
 MIT License
@@ -31,7 +35,7 @@ from sklearn.base import BaseEstimator, ClassifierMixin
 from sklearn.model_selection import GridSearchCV, train_test_split
 from . import to_categorical
 from sklearn.metrics import log_loss, accuracy_score, recall_score
-from sklearn.datasets import load_iris,load_digits
+from sklearn.preprocessing import OneHotEncoder
 # from keras import losses
 
 def _mean_squared_error(y_true, y_pred):
@@ -145,15 +149,26 @@ class ELM(object):
             ret = None
         return ret
 
+    def _transform_label(self, y):
+        enc = OneHotEncoder(handle_unknown='ignore')
+        try:
+            target = enc.fit_transform(y).toarray()
+            # print('the label can be transformed directly using onehotencoder')
+        except:
+            target = enc.fit_transform(y.reshape(-1, 1)).toarray()
+            # print('the label must be reshaped before being transformed')
+        return target
 
     def fit(self, x, t):
+        one_hot_target = self._transform_label(t)
+
         H = self.__activation(x.dot(self.__alpha) + self.__bias)
 
         # compute a pseudoinverse of H
         H_pinv = np.linalg.pinv(H)
 
         # update beta
-        self.__beta = H_pinv.dot(t)
+        self.__beta = H_pinv.dot(one_hot_target)
 
     def save(self, filepath):
         with h5py.File(filepath, 'w') as f:
@@ -298,15 +313,19 @@ class ELMClassifier(BaseEstimator, ClassifierMixin):
         # ===============================
         # ELM parameters
         # ===============================
+        self.model = None # will be instantiated in fit()
+        self.classes_ = 0 # will be instantiated in fit()
+        self.n_features_in_ = 0 # will be instantiated in fit()
+
         self.n_hidden_nodes = n_hidden_nodes #x_train.shape[1]
         self.loss = 'mean_squared_error' # 'mean_absolute_error'
         self.activation = activation # 'sigmoid' # 'identity' # 'relu'
         
     def fit(self, X, y):
+        '''
+        Instantiate an inner ELM and fit it to the data
+        '''
         
-        # ===============================
-        # Instantiate ELM
-        # ===============================
         if len(y.shape) == 2: #one-hot
             n_classes = y.shape[1]
         else:
@@ -323,24 +342,24 @@ class ELMClassifier(BaseEstimator, ClassifierMixin):
         
         self.classes_ = np.unique(y)
         self.model.fit(X, y)
+        self.n_features_in_ = X.shape[1] # n_features_in_ is the number of features that an estimator expects.
 
+    def predict_proba(self, X):
         '''
-        n_features_in_ is the number of features that an estimator expects.
-        In most cases, the n_features_in_ attribute exists only once fit has been called, but there are exceptions.
+        This doesn't return the probability directly, but the raw output from the ann.
+        You may call softmax() on the output to get the formalized probability. 
         '''
-        self.n_features_in_ = X.shape[1]
-
-    def predict_proba(self, X):        
-        yh = self.model.predict(X)
-        # print(yh) # array e.g., 0.37854525 0.         0.         
+        yh = self.model.predict(X) # this is a direct output from ann, e.g., 0.37854525 0.         0.         
         return yh
 
     def predict(self, X):
+        '''
+        return the class labels
+        '''
         yh = self.model.predict(X) # (m,  n_classes)
         if (len(yh.shape) <= 1): # e.g., (m, )
             return yh > 0.5 # default 0.5 threshold
         yh = np.argmax(yh, axis=-1)
-        # print(yh.shape)
         return yh
 
     def evaluate(self, val_x, val_y, metrics=['loss', 'accuracy']):
@@ -407,10 +426,10 @@ class ELMClassifier(BaseEstimator, ClassifierMixin):
         t = t_test[:10]
         y_pred = clf.predict_proba(x)
 
-        for i in range(len(y_pred)):
+        for i, y_pred_i in enumerate(y_pred):
             print('---------- prediction %d ----------' % (i+1))
-            class_pred = np.argmax(y_pred[i])
-            prob_pred = y_pred[i][class_pred]
+            class_pred = np.argmax(y_pred_i)
+            prob_pred = y_pred_i[class_pred]
             class_true = np.argmax(t[i])
             print('class: %d, probability: %f' % (class_pred, prob_pred))
             print('class (true): %d' % class_true)
@@ -429,6 +448,8 @@ class ELMClassifier(BaseEstimator, ClassifierMixin):
 
     def run_iris_example():
 
+        from sklean.datasets import load_iris
+
         # ===============================
         # Load dataset
         # ===============================
@@ -443,7 +464,7 @@ class ELMClassifier(BaseEstimator, ClassifierMixin):
         ELMClassifier.run_example(x_train, x_test, t_train, t_test)
 
     def run_mnist_example():
-
+        
         from keras.datasets import mnist
 
         n_classes = 10
