@@ -449,11 +449,12 @@ class LogisticRegressionX(LogisticRegression, ClassifierMixin):
         y = np.nan_to_num(y)
         return LogisticRegression.score(X=X, y=y)   
 
-def homo_stacking(X, y, create_base_estimator, meta_learner = LogisticRegressionX,
+def homo_stacking(X, y, create_base_estimator, 
+                  meta_learner = LogisticRegressionX,
                   Ns = [1, 2, 5], Ls = [1, 2, 5, 10, 20], 
-                  test_size = .3, 
+                  test_size = .3,
                   random_state = None,
-                  WITH_CONTEXT = False, 
+                  WITH_CONTEXT = False,
                   xlabel = '',
                   YLIM = (.5, 1.05)):
     '''

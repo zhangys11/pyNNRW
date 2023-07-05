@@ -13,7 +13,7 @@ class RVFL:
 
     Attributes:
         n_nodes: An integer of enhancement node number.
-        lam: A floating number of regularization parameter.
+        lam: A floating number of regularization parameter. Controls the direct-link strength.
         w_random_vec_range: A list, [min, max], the range of generating random weights.
         b_random_vec_range: A list, [min, max], the range of generating random bias.
         random_weights: A Numpy array shape is [n_feature, n_nodes], weights of neuron.
@@ -31,7 +31,7 @@ class RVFL:
                  task_type='classification'):
         assert task_type in ['classification', 'regression'], 'task_type should be "classification" or "regression".'
         self.n_nodes = n_nodes
-        self.lam = lam
+        self.lam = lam # controls the direct-link strength
         self.w_random_range = w_random_vec_range
         self.b_random_range = b_random_vec_range
         self.random_weights = None
@@ -39,8 +39,8 @@ class RVFL:
         self.beta = None
         a = Activation()
         self.activation_function = getattr(a, activation)
-        self.data_std = None
-        self.data_mean = None
+        # self.data_std = None
+        # self.data_mean = None
         self.same_feature = same_feature
         self.task_type = task_type
 
@@ -57,7 +57,7 @@ class RVFL:
         assert len(data) == len(label), 'Label number does not match data number.'
         assert len(label.shape) == 1, 'Label should be 1-D array.'
 
-        data = self.standardize(data)  # Normalization data
+        # data = self.standardize(data)  # Normalization data
         n_sample = len(data) #样本数量
         n_feature = len(data[0]) #特征数量
         self.random_weights = self.get_random_vectors(n_feature, self.n_nodes, self.w_random_range) #构成随机权重值
@@ -83,7 +83,7 @@ class RVFL:
         :return: When classification, return Prediction result and probability.
                  When regression, return the output of rvfl.
         """
-        data = self.standardize(data)  # Normalization data
+        # data = self.standardize(data)  # Normalization data
         h = self.activation_function(np.dot(data, self.random_weights) + self.random_bias)
         d = np.concatenate([h, data], axis=1)
         d = np.concatenate([d, np.ones_like(d[:, 0:1])], axis=1)
@@ -108,7 +108,7 @@ class RVFL:
         assert len(data) == len(label), 'Label number does not match data number.'
         assert len(label.shape) == 1, 'Label should be 1-D array.'
 
-        data = self.standardize(data)  # Normalization data
+        # data = self.standardize(data)  # Normalization data
         h = self.activation_function(np.dot(data, self.random_weights) + self.random_bias)
         d = np.concatenate([h, data], axis=1)
         d = np.concatenate([d, np.ones_like(d[:, 0:1])], axis=1)
