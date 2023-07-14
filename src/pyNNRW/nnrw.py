@@ -1,13 +1,11 @@
-import warnings
-warnings.filterwarnings("ignore")
-
 import time
+import warnings
 import numpy as np
 import matplotlib.pyplot as plt
 import matplotlib.ticker as mticker
 from sklearn.base import BaseEstimator, ClassifierMixin
 from sklearn.model_selection import train_test_split
-from sklearn.linear_model import LogisticRegression
+from sklearn.linear_model import LogisticRegression, LogisticRegressionCV
 from sklearn.ensemble import StackingClassifier #,HistGradientBoostingClassifier
 from sklearn.tree import DecisionTreeClassifier
 from sklearn.svm import SVC
@@ -15,6 +13,8 @@ from sklearn.multiclass import OneVsOneClassifier
 from sklearn.metrics import r2_score
 
 from . import to_categorical
+
+warnings.filterwarnings("ignore")
 
 #region Performance Test. Compare NNRW with mainstream classifier models.
 
@@ -456,7 +456,7 @@ def homo_stacking(X, y, create_base_estimator,
                   random_state = None,
                   WITH_CONTEXT = False,
                   xlabel = '',
-                  YLIM = (.5, 1.05)):
+                  YLIM = None):
     '''
     create_base_estimator # a function that create base learner instanes
     Ns = [1, 2, 5] # number of base estimators
@@ -477,7 +477,7 @@ def homo_stacking(X, y, create_base_estimator,
     for N in Ns:
         ACCs = []
 
-        for L in Ls:        
+        for L in Ls:
 
             accs = []
 
@@ -509,30 +509,44 @@ def homo_stacking(X, y, create_base_estimator,
         # plt.scatter(Ls, ACCs, s = 50)
 
     plt.gca().xaxis.set_major_locator(mticker.MultipleLocator(1)) # only show integer
+    plt.gca().yaxis.set_major_locator(mticker.MultipleLocator(.1)) # only show integer
+    
+    Ls = np.array(Ls)
+    plt.xlim( (Ls.min() - .5, Ls.max() + .5) )
     plt.legend()
     plt.xlabel('Hyper-parameter' + xlabel)
     plt.ylabel("Classfication Accuracy")
-    plt.ylim(YLIM)
+    if YLIM is None:
+        plt.ylim( (np.min(list(dic_acc.values())) - .05, 1.05) )
+    else:
+        plt.ylim(YLIM) # e.g., (.4, 1.05)
     plt.show()
 
     print('best test accuracy: ', max(dic_acc.values()), 'N, L = ', [key for key, value in dic_acc.items() if value == max(dic_acc.values())])
 
     return dic_acc
     
-def hetero_stacking(X, y, estimators, repeat = 10, WITH_CONTEXT = True):
+def hetero_stacking(X, y, estimators,
+                    test_size = .3, random_state = None,
+                    WITH_CONTEXT = False, repeat = 5):
     '''
     estimators: a batch of base learners. Each learner should be derived from the BaseEstimator type.    
     '''
     acc = 0
+    repeat = 1
     
-    for iter in range(repeat):
+    for _ in range(repeat):
 
         X_train, X_test, y_train, y_test = train_test_split(
-            X, y
+            X, y, stratify=y,
+            test_size= test_size,
+            random_state=random_state
         )
 
         clf = StackingClassifier(
-            estimators=estimators, final_estimator=LogisticRegressionCV(), passthrough = WITH_CONTEXT
+            estimators=estimators, 
+            final_estimator=LogisticRegressionCV(),
+            passthrough = WITH_CONTEXT
         )
 
         acc = acc + clf.fit(X_train, y_train).score(X_test, y_test)
@@ -562,8 +576,10 @@ class FSSE(BaseEstimator, ClassifierMixin):
         self.create_base_estimator_cv = create_base_estimator_cv
         self.feature_split = feature_split
         self.meta_l1_ratios = meta_l1_ratios
+        self.base_learners = {}
+        self.meta_learner = None
 
-    def fit(self, X, y):     
+    def fit(self, X, y):
         
         if isinstance(self.feature_split, int):
             self.feature_split = abs(self.feature_split)
@@ -571,9 +587,8 @@ class FSSE(BaseEstimator, ClassifierMixin):
         if (self.feature_split == 'all' or self.feature_split >= X.shape[1]):
             self.feature_split = X.shape[1] 
 
-        X_train, X_test, y_train, y_test = train_test_split(X, y)
-        
-        self.base_learners = {}
+        X_train, X_test, y_train, y_test = train_test_split(X, y, stratify=y)
+                
         predicts = []
         for i in range(0, X.shape[1], self.feature_split): # TODO: padding to N*feature_split, or special treatment for the last group.
             clfcv = self.create_base_estimator_cv().fit(X_train[:,i:i+ self.feature_split], y_train)
@@ -586,7 +601,7 @@ class FSSE(BaseEstimator, ClassifierMixin):
         self.meta_learner = LogisticRegressionCV(penalty = 'elasticnet',  # use elasticnet penalty to get sparse result
                                             l1_ratios = self.meta_l1_ratios, # require at least 0.5 L1 ratio for sparsity
                                            solver = 'saga' # only saga support elasticnet penalty
-                                           ).fit(predicts ,y_test)  
+                                           ).fit(predicts ,y_test)
         # print(meta_learner.l1_ratio_)
         # plt.plot(meta_learner.coef_[0])
         # return base_learners, meta_learner  
@@ -596,9 +611,9 @@ class FSSE(BaseEstimator, ClassifierMixin):
         base leaners' prediction, used as the input for meta-learner
         '''
         predicts = []
-        for b in self.base_learners:
-            FS = X[:,b[0]:b[1]]
-            yhat = self.base_learners[b].predict(FS)
+        for k, b in self.base_learners.items():
+            FS = X[:,k[0]:k[1]]
+            yhat = b.predict(FS)
             predicts.append(yhat)
 
         return np.array(predicts).T
@@ -673,9 +688,9 @@ class FSSE(BaseEstimator, ClassifierMixin):
 
         return biggest_fsse_fs, fs_importance
 
-def fsse_homo_stacking(X, y, create_base_estimator_cv, split_range = range(1, 20), repeat = 3, summary = 'median'):
+def fsse_homo_stacking(X, y, create_base_estimator_cv, split_range = range(1, 20), repeat = 3, summary = 'median', display = False):
 
-    accs = []
+    dic_accs = {}
     r = split_range
     N = repeat
 
@@ -690,15 +705,17 @@ def fsse_homo_stacking(X, y, create_base_estimator_cv, split_range = range(1, 20
             accs_repeat.append(fsse.evaluate(X, y))
 
         if summary == 'median':
-            accs.append( np.median(accs_repeat) )
+            dic_accs[split] = np.median(accs_repeat)
         else:
-            accs.append( np.mean(accs_repeat) ) # otherwise, mean
+            dic_accs[split] = np.mean(accs_repeat) # otherwise, mean
 
-    plt.figure(figsize = (12,3))
-    plt.scatter(r,accs)
-    plt.plot(r, accs)
-    plt.show()
+    if display:
+
+        plt.figure(figsize = (12,3))
+        plt.scatter(r, list(dic_accs.values()))
+        plt.plot(r, list(dic_accs.values()))
+        plt.show()
     
-    return accs
+    return dic_accs
 
 #endregion

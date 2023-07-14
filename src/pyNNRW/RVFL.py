@@ -25,8 +25,8 @@ class RVFL:
         same_feature: A bool, the true means all the features have same meaning and boundary for example: images.
         task_type: A string of ML task type, 'classification' or 'regression'.
     """
-    def __init__(self, n_nodes, lam, w_random_vec_range = [-1, 1], 
-                 b_random_vec_range = [0, 1], activation = 'sigmoid', 
+    def __init__(self, n_nodes, lam, w_random_vec_range = [-1, 1],
+                 b_random_vec_range = [0, 1], activation = 'sigmoid',
                  same_feature=False,
                  task_type='classification'):
         assert task_type in ['classification', 'regression'], 'task_type should be "classification" or "regression".'
@@ -233,7 +233,7 @@ class RVFL_v2(object):
     hidden_nodes : default 50, the number of enhancement node between the input layer and the hidden layer
     random_type :default = 'uniform', please select random type from "uniform" or "gaussian"
     activation_name : default = 'sigmoid', please select an activation function from the below set: {'sigmoid', 'tanh',
-                     'sin', 'hardlim', 'softlim', 'gaussianRBF', 'multiquadricRBF', 'inv_multiquadricRBF', 'tribas',
+                     'sine', 'hardlim', 'softlim', 'gaussianRBF', 'multiquadricRBF', 'inv_multiquadricRBF', 'tribas',
                        'inv_tribas'}
     type: default='classification', classification or regression
     Example
@@ -252,7 +252,7 @@ class RVFL_v2(object):
         self.activation_name = activation_name
         self.type = type
         self._activation_dict = {'sigmoid': lambda x : 1.0 / (1.0 + np.exp(-x)),
-                                 "sin": lambda x: np.sin(x),
+                                 "sine": lambda x: np.sin(x),
                                  "tanh": lambda x: np.tanh(x),
                                  "hardlim": lambda x:np.array(x > 0.0, dtype=float),
                                  "softlim":lambda x:np.clip(x, 0.0, 1.0),
@@ -407,14 +407,19 @@ class RVFLClassifier_v2(BaseEstimator, ClassifierMixin):
         return self.model.evaluate(X, y, metrics=metrics)
 
 class RVFLClassifierCV():
+    '''
+    Encapsulate RVFL as a sklearn estimator and use CV to optimize its hyper-parameters
+    '''
 
-    def __init__(self, hparams = {'n_hidden_nodes': [1, 10], 'activation': ['sigmoid', 'tanh', 'sin'] }):        
+    def __init__(self, hparams = {'n_hidden_nodes': [1, 10], 'activation': ['sigmoid', 'tanh', 'sine'] }):      
         '''
         parameters  
         ----------
         hparams : hyper-parameter candidate values to be grid-searched
         '''
         self.parameters =hparams
+        self.clf = None
+        self.classes_ = []
        
     def fit(self, X, y):
         rvflc = RVFLClassifier()
